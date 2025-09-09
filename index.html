@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>無人店舗分析ツール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- ライブラリ（CDN） -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <link rel="stylesheet" href="assets/css/inline_1.css">
+</head>
+<body>
+  <h1>無人店舗分析ツール</h1>
+  <p class="muted">データはブラウザ内でのみ処理され、サーバーへ送信されません。</p>
+
+  <!-- 取込UI -->
+  <div class="card">
+    <label style="margin-bottom:10px;">csv取り込み</label>
+
+    <div class="btn-group" style="margin-bottom:6px;">
+      <div class="fileline">
+        <button id="pickTx" class="btn" type="button">取引毎</button>
+        <span id="fnameTx" class="fname muted">未選択</span>
+      </div>
+
+      <div class="fileline">
+        <button id="pickLn" class="btn" type="button">商品毎</button>
+        <span id="fnameLn" class="fname muted">未選択</span>
+      </div>
+
+      <div class="fileline">
+        <button id="pickPm" class="btn secondary" type="button">商品マスタ取り込み(csv)</button>
+        <span id="fnamePm" class="fname muted">未選択</span>
+    </div>
+
+    <!-- 実体の file input -->
+    <input id="txFile" type="file" accept=".csv" />
+    <input id="lnFile" type="file" accept=".csv" />
+    <input id="pmFile" type="file" accept=".csv" />
+
+    <div class="btn-group" style="margin-top:8px;">
+      <button id="runBtn" class="btn" disabled>集計実行</button>
+      <span id="catStatus" class="muted">カテゴリマスタ：サーバーから取り込み済み</span>
+    </div>
+
+    <p class="muted" style="margin-top:8px;">
+      　
+    </p>
+  </div>
+
+  <!-- タブ -->
+  <div class="tabs">
+    <div class="tab active" data-tab="previewTab">取り込みデータsummary</div>
+    <div class="tab" data-tab="bestTab">ベスレポ集計</div>
+    <div class="tab" data-tab="timeTab">時間帯集計</div>
+    <div class="tab" data-tab="prodTab">単品分析</div>
+    <div class="tab" data-tab="rfmTab">RFM分析</div>
+    <div class="tab" data-tab="segTab">セグメント分析</div>
+    <div class="tab" data-tab="repeatOnlyTab">リピート分析</div>
+    <div class="tab" data-tab="pairOnlyTab">併売分析</div>
+  </div>
+
+  <!-- 取り込みデータsummary -->
+  <div id="previewTab" class="tabcontent active">
+    <div class="card">
+      <h2>取り込みサマリー</h2>
+      <div class="metrics" id="summary"></div>
+      <div class="diag" id="masterDiag" style="display:none;"></div>
+      <div id="preview" class="muted">（先頭50行プレビューを表示）</div>
+    </div>
+  </div>
+
+  <!-- ベスレポ集計 -->
+  <div id="bestTab" class="tabcontent">
+    <div class="card">
+      <h2>ベスレポ集計</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="bestStart" /></div>
+        <div><label>終了日</label><input type="date" id="bestEnd" /></div>
+        <div>
+          <label>ランキング軸</label>
+          <select id="bestMetric">
+            <option value="amt">売上順（明細金額合計）</option>
+            <option value="qty">点数順（販売数量合計）</option>
+            <option value="gp">粗利順（粗利合計）</option>
+            <option value="uniq">購買ユニークユーザー数順</option>
+            <option value="repeat">リピートユーザー数順（同一JANを2回以上）</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="bestRun" class="btn">この条件で集計</button>
+          <button id="bestExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+      <div id="bestInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="bestTable"></div>
+    </div>
+  </div>
+
+  <!-- 時間帯集計 -->
+  <div id="timeTab" class="tabcontent">
+    <div class="card">
+      <h2>時間帯集計（1時間ごと）</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="timeStart" /></div>
+        <div><label>終了日</label><input type="date" id="timeEnd" /></div>
+        <div>
+          <label>曜日</label>
+          <select id="timeDow">
+            <option value="all">すべて</option>
+            <option value="weekday">平日</option>
+            <option value="weekend">土日</option>
+          </select>
+        </div>
+        <div>
+          <label>指標</label>
+          <select id="timeMetric">
+            <option value="amt">売上金額（合計）</option>
+            <option value="receipts">レシート件数</option>
+            <option value="basket">バスケットサイズ（点数/レシート）</option>
+            <option value="aov">平均客単価（売上/レシート）</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="timeRun" class="btn">この条件で集計</button>
+          <button id="timeExport" class="btn ghost" disabled>CSVエクスポート</button>
+          <button id="timePng" class="btn ghost" disabled>PNG保存</button>
+        </div>
+      </div>
+      <div id="timeInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="timeChart" style="height:360px;"></div>
+      <div id="timeTable" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- 単品分析 -->
+  <div id="prodTab" class="tabcontent">
+    <div class="card">
+      <h2>単品分析</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="prodStart" /></div>
+        <div><label>終了日</label><input type="date" id="prodEnd" /></div>
+        <div><label>JANコード</label><input type="text" id="prodJan" placeholder="半角JANを入力" /></div>
+        <div class="btn-group"><button id="prodRun" class="btn">この条件で集計</button></div>
+      </div>
+      <div id="prodHeader" class="muted" style="margin-bottom:8px;"></div>
+      <div class="metrics" id="prodSummary"></div>
+      <div id="prodChart" style="height:320px; margin-top:8px;"></div>
+      <div id="prodDiag" class="diag" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- RFM分析 -->
+  <div id="rfmTab" class="tabcontent">
+    <div class="card">
+      <div class="hstack">
+        <h2 style="margin:0;">RFM分析</h2>
+        <button class="info-btn" data-modal="modalRfm" title="RFMの説明">i</button>
+        <button class="info-btn" data-modal="modalScore" title="スコアリングの説明">i</button>
+        <button class="info-btn" data-modal="modalSeg" title="セグメント定義">i</button>
+      </div>
+
+      <div class="form-row" style="margin-top:8px;">
+        <div><label>開始日</label><input type="date" id="rfmStart" /></div>
+        <div><label>終了日</label><input type="date" id="rfmEnd" /></div>
+        <div>
+          <label>税率（Mは税抜換算）</label>
+          <select id="rfmTax">
+            <option value="0">0%（既に税抜）</option>
+            <option value="10" selected>10%（税込→税抜）</option>
+            <option value="8">8%（軽減）</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="rfmRun" class="btn">この条件で集計</button>
+          <button id="rfmExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+
+      <div id="rfmInfo" class="muted" style="margin-bottom:10px;"></div>
+
+      <div class="grid2">
+        <div id="rfmPie" style="height:320px;"></div>
+        <div id="rfmScatter" style="height:320px;"></div>
+      </div>
+
+      <div id="rfmTable" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <!-- セグメント分析（実装） -->
+  <div id="segTab" class="tabcontent">
+    <div class="card">
+      <h2>セグメント分析</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="segStart" /></div>
+        <div><label>終了日</label><input type="date" id="segEnd" /></div>
+        <div>
+          <label>対象セグメント</label>
+          <div class="seg-checks">
+            <label><input type="checkbox" class="segChk" value="ヘビーユーザー" checked> ヘビー</label>
+            <label><input type="checkbox" class="segChk" value="一般ユーザー" checked> 一般</label>
+            <label><input type="checkbox" class="segChk" value="ライトユーザー" checked> ライト</label>
+            <label><input type="checkbox" class="segChk" value="離反傾向"> 離反傾向</label>
+            <label><input type="checkbox" class="segChk" value="離反顧客"> 離反</label>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button id="segRun" class="btn">この条件で集計</button>
+          <button id="segExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+
+      <div id="segInfo" class="muted" style="margin-bottom:8px;"></div>
+
+      <div class="seg-card">
+        <div>
+          <h3 style="margin:6px 0;">KPI</h3>
+          <div id="segKpi" class="metrics"></div>
+          <div id="segTimeChart" style="height:320px; margin-top:10px;"></div>
+        </div>
+        <div>
+          <h3 style="margin:6px 0;">カテゴリ Top20</h3>
+          <div id="segCatTable"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <h3 style="margin:6px 0;">商品 Top100</h3>
+        <div id="segProdTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- リピート分析（実装） -->
+  <div id="repeatOnlyTab" class="tabcontent">
+    <div class="card">
+      <h2>リピート分析</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="repeatStart" /></div>
+        <div><label>終了日</label><input type="date" id="repeatEnd" /></div>
+        <div>
+          <label>対象セグメント</label>
+          <div class="seg-checks">
+            <label><input type="checkbox" class="repeatChk" value="ヘビーユーザー" checked> ヘビー</label>
+            <label><input type="checkbox" class="repeatChk" value="一般ユーザー" checked> 一般</label>
+            <label><input type="checkbox" class="repeatChk" value="ライトユーザー" checked> ライト</label>
+            <label><input type="checkbox" class="repeatChk" value="離反傾向"> 離反傾向</label>
+            <label><input type="checkbox" class="repeatChk" value="離反顧客"> 離反</label>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button id="repeatRun" class="btn">この条件で集計</button>
+          <button id="repeatExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+
+      <div id="repeatInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="repeatKpi" class="metrics"></div>
+      <div id="repeatTable"></div>
+    </div>
+  </div>
+
+  <!-- 併売分析（実装） -->
+  <div id="pairOnlyTab" class="tabcontent">
+    <div class="card">
+      <h2>併売分析</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="pairStart" /></div>
+        <div><label>終了日</label><input type="date" id="pairEnd" /></div>
+        <div>
+          <label>対象セグメント</label>
+          <div class="seg-checks">
+            <label><input type="checkbox" class="pairChk" value="ヘビーユーザー" checked> ヘビー</label>
+            <label><input type="checkbox" class="pairChk" value="一般ユーザー" checked> 一般</label>
+            <label><input type="checkbox" class="pairChk" value="ライトユーザー" checked> ライト</label>
+            <label><input type="checkbox" class="pairChk" value="離反傾向"> 離反傾向</label>
+            <label><input type="checkbox" class="pairChk" value="離反顧客"> 離反</label>
+          </div>
+        </div>
+        <div>
+          <label>最小同時購買レシート数</label>
+          <input type="text" id="pairMinSupp" value="5" />
+        </div>
+        <div>
+          <label>並び順</label>
+          <select id="pairSortKey">
+            <option value="lift">リフト（優先）</option>
+            <option value="support">同時購買数</option>
+            <option value="conf">信頼度（max）</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="pairRun" class="btn">この条件で集計</button>
+          <button id="pairExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+
+      <div id="pairInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="pairTable"></div>
+    </div>
+  </div>
+
+  <!-- === ポップアップ（モーダル） === -->
+  <div id="modalRfm" class="modal"><div class="dialog">
+    <span class="close" data-close="modalRfm">×</span>
+    <h3>RFMの説明</h3>
+    <ul>
+      <li><b>R（Recency：最近性）</b> … 基準日（終了日の23:59）から最終購入日までの経過日数。小さいほど良い。</li>
+      <li><b>F（Frequency：頻度）</b> … 期間内の購入回数（ユニークなレシート件数）。</li>
+      <li><b>M（Monetary：金額）</b> … 期間内の購買金額合計（<b>税抜</b>）。</li>
+    </ul>
+    <p class="muted">顧客IDはCGID、日時は「生成時間」、金額は明細（商品価格×数量）から算出します。</p>
+  </div></div>
+
+  <div id="modalScore" class="modal"><div class="dialog">
+    <span class="close" data-close="modalScore">×</span>
+    <h3>スコアリングの説明</h3>
+    <p>全顧客に対する分位を用いて 1〜5 点を付与します（データが少ない場合は自動で3段階）。</p>
+    <ul>
+      <li><b>R</b>：値が小さいほど良い → 小さい方から<b>5点</b>（逆スコア）。</li>
+      <li><b>F / M</b>：大きいほど良い → 大きい方から<b>5点</b>。</li>
+    </ul>
+  </div></div>
+
+  <div id="modalSeg" class="modal"><div class="dialog">
+    <span class="close" data-close="modalSeg">×</span>
+    <h3>セグメント定義</h3>
+    <ul>
+      <li><b>ヘビーユーザー</b> … R≥4 かつ F≥4（かつ M≥3）</li>
+      <li><b>一般ユーザー</b> … R=3–4 かつ F=3（±1許容）</li>
+      <li><b>ライトユーザー</b> … R≥4 かつ F≤2</li>
+      <li><b>離反傾向</b> … R=2–3 かつ F≤3</li>
+      <li><b>離反顧客</b> … R≤2（Fは問わず）</li>
+    </ul>
+    <p class="muted">まずはR×Fを主指標として簡潔な5分類。運用で閾値調整可能です。</p>
+  </div></div>
+
+  <script src="assets/js/inline_1.js"></script>
+</body>
+</html>
