@@ -834,6 +834,212 @@ matched++;
       const receipts = new Set(rows.map(r=> r.オーダーID).filter(Boolean));
       return { segOf, users, receipts, rows };
     }
+// ===== 商品分類別集計 =====
+function computeCategoryReport(){
+  if (!joined.length){
+    $("catInfo").textContent = "先にCSVを取り込んでください。";
+    $("catTable").innerHTML = "";
+    $("catExport").disabled = true;
+    lastCatRows = null; lastCatMeta = null;
+    return;
+  }
+  const s = $("catStart").value;
+  const e = $("catEnd").value;
+  const metric = $("catMetric").value; // qty / amt / gp / uniq / repeat
+
+  const sDate = s ? new Date(s+"T00:00:00") : null;
+  const eDate = e ? new Date(e+"T23:59:59") : null;
+
+  const rows = joined.filter(r=>{
+    if (!r.生成時間) return false;
+    if (sDate && r.生成時間 < sDate) return false;
+    if (eDate && r.生成時間 > eDate) return false;
+    return true;
+  });
+  if (!rows.length){
+    $("catInfo").textContent = "該当データがありません。";
+    $("catTable").innerHTML = "";
+    $("catExport").disabled = true;
+    lastCatRows = []; lastCatMeta = {start:s||"", end:e||""};
+    return;
+  }
+
+  // カテゴリは「小分類名」があればそれを表示名に。無ければ商品分類コード。
+  const byCat = new Map(); // key -> { カテゴリ, 購買ユーザーset, userCnt(Map), 金額, 点数, 粗利 }
+  for (const r of rows){
+    const key = (r.小分類名 && r.小分類名.trim()) ? r.小分類名 : (r.商品分類 || "-");
+    if (!byCat.has(key)){
+      byCat.set(key, { カテゴリ:key, 購買ユーザーset:new Set(), userCnt:new Map(), 金額:0, 点数:0, 粗利:0 });
+    }
+    const o = byCat.get(key);
+    o.金額 += (r.明細金額 || 0);
+    o.点数 += (r.商品数   || 0);
+    o.粗利 += (r.明細粗利 || 0);
+    if (r.CGID){
+      o.購買ユーザーset.add(r.CGID);
+      o.userCnt.set(r.CGID, (o.userCnt.get(r.CGID)||0) + (r.商品数||0));
+    }
+  }
+
+  const list = [];
+  for (const o of byCat.values()){
+    const repeatUsers = Array.from(o.userCnt.values()).filter(v=> v>=2).length;
+    list.push({
+      カテゴリ: o.カテゴリ,
+      購入額合計: Math.round(o.金額),
+      点数合計: Math.round(o.点数),
+      粗利額合計: Math.round(o.粗利),
+      購入ユニークユーザー数合計: o.購買ユーザーset.size,
+      リピートユーザー数合計: repeatUsers
+    });
+  }
+
+  const sortKeyMap = { qty:"点数合計", amt:"購入額合計", gp:"粗利額合計", uniq:"購入ユニークユーザー数合計", repeat:"リピートユーザー数合計" };
+  const sortKey = sortKeyMap[metric] || "購入額合計";
+  list.sort((a,b)=> (b[sortKey] - a[sortKey]) || (b["購入額合計"] - a["購入額合計"]));
+
+  $("catInfo").textContent = `期間: ${s || "-"} ~ ${e || "-"} / 件数: ${list.length.toLocaleString()}`;
+  renderTable(list, "catTable", ["カテゴリ","購入額合計","点数合計","粗利額合計","購入ユニークユーザー数合計","リピートユーザー数合計"], null);
+
+  lastCatRows = list;
+  lastCatMeta = { start:s||"", end:e||"", metric:metric };
+  $("catExport").disabled = !lastCatRows || !lastCatRows.length;
+}
+function exportCategoryCSV(){
+  if (!lastCatRows || !lastCatRows.length) return;
+  const headers = ["カテゴリ","購入額合計","点数合計","粗利額合計","購入ユニークユーザー数合計","リピートユーザー数合計"];
+  const ymd = s=> s ? s.replaceAll("-","/") : "-";
+  const metricLabel = { qty:"点数順", amt:"購入額合計順", gp:"粗利額合計順", uniq:"購入ユニークユーザー数合計順", repeat:"リピートユーザー数合計順" }[lastCatMeta.metric] || "購入額合計順";
+  const preface = `${ymd(lastCatMeta.start)} ~ ${ymd(lastCatMeta.end)} 商品分類別集計（${metricLabel}）`;
+  const lines = ["\uFEFF"+preface, headers.join(",")];
+  for (const r of lastCatRows){
+    const row = headers.map(h=> {
+      let v = r[h]; if (v==null) v="";
+      v = String(v).replaceAll('"','""');
+      if (/[",\n]/.test(v)) v=`"${v}"`;
+      return v;
+    });
+    lines.push(row.join(","));
+  }
+  const csv = lines.join("\n");
+  const fn = `${lastCatMeta.start||"all"}_${lastCatMeta.end||"all"}_category.csv`;
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=fn; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ===== 商品分類別ベスレポ =====
+// 各カテゴリ内で商品ランキング（上位20位）を作成し、カテゴリごとに連結して出力する
+function computeCategoryBestReport(){
+  if (!joined.length){
+    $("catBestInfo").textContent = "先にCSVを取り込んでください。";
+    $("catBestTable").innerHTML = "";
+    $("catBestExport").disabled = true;
+    lastCatBestRows = null; lastCatBestMeta = null;
+    return;
+  }
+  const s = $("catBestStart").value;
+  const e = $("catBestEnd").value;
+  const metric = $("catBestMetric").value; // amt/qty/gp/uniq/repeat
+
+  const sDate = s ? new Date(s+"T00:00:00") : null;
+  const eDate = e ? new Date(e+"T23:59:59") : null;
+
+  const rows = joined.filter(r=>{
+    if (!r.生成時間) return false;
+    if (sDate && r.生成時間 < sDate) return false;
+    if (eDate && r.生成時間 > eDate) return false;
+    return true;
+  });
+  if (!rows.length){
+    $("catBestInfo").textContent = "該当データがありません。";
+    $("catBestTable").innerHTML = "";
+    $("catBestExport").disabled = true;
+    lastCatBestRows = []; lastCatBestMeta = {start:s||"", end:e||"", metric};
+    return;
+  }
+
+  // カテゴリ -> JAN 集計
+  const byCatJan = new Map(); // key(cat) -> Map(jan -> agg)
+  for (const r of rows){
+    const cat = (r.小分類名 && r.小分類名.trim()) ? r.小分類名 : (r.商品分類 || "-");
+    if (!byCatJan.has(cat)) byCatJan.set(cat, new Map());
+    const m = byCatJan.get(cat);
+    const jan = r.JANコード || "-";
+    if (!m.has(jan)){
+      m.set(jan, { JANコード:jan, 商品名:r.商品名||"", 金額:0, 点数:0, 粗利:0, _users:new Map() });
+    }
+    const o = m.get(jan);
+    o.金額 += (r.明細金額||0);
+    o.点数 += (r.商品数||0);
+    o.粗利 += (r.明細粗利||0);
+    if (r.CGID) o._users.set(r.CGID, (o._users.get(r.CGID)||0) + (r.商品数||0));
+  }
+
+  // カテゴリごとに並べ替え・上位20
+  const sortKeyMap = { amt:"金額", qty:"点数", gp:"粗利", uniq:"_uniq", repeat:"_repeat" };
+  const listAll = [];
+  for (const [cat, mp] of byCatJan.entries()){
+    const arr = [];
+    for (const it of mp.values()){
+      const uniq = it._users.size;
+      const repeat = Array.from(it._users.values()).filter(v=> v>=2).length;
+      arr.push({
+        カテゴリ: cat,
+        JANコード: it.JANコード,
+        商品名: it.商品名,
+        売上金額合計: Math.round(it.金額),
+        売上点数合計: Math.round(it.点数),
+        粗利合計: Math.round(it.粗利),
+        購買ユニークユーザー数: uniq,
+        リピートユーザー数: repeat
+      });
+    }
+    const sk = sortKeyMap[metric] || "金額";
+    arr.sort((a,b)=>{
+      const av = (sk==="金額")?a.売上金額合計:(sk==="点数")?a.売上点数合計:(sk==="粗利")?a.粗利合計:(sk==="_uniq")?a.購買ユニークユーザー数:a.リピートユーザー数;
+      const bv = (sk==="金額")?b.売上金額合計:(sk==="点数")?b.売上点数合計:(sk==="粗利")?b.粗利合計:(sk==="_uniq")?b.購買ユニークユーザー数:b.リピートユーザー数;
+      return (bv - av) || (b.売上金額合計 - a.売上金額合計);
+    });
+
+    // 上位20を抽出し、カテゴリ内順位を付与
+    arr.slice(0,20).forEach((o, idx)=>{
+      listAll.push({ ランク: idx+1, ...o });
+    });
+  }
+
+  // カテゴリ → ランク → 指標 の並びで見やすく
+  listAll.sort((a,b)=> a.カテゴリ.localeCompare(b.カテゴリ, "ja") || a.ランク - b.ランク);
+
+  $("catBestInfo").textContent = `期間: ${s || "-"} ~ ${e || "-"} / カテゴリ数: ${byCatJan.size.toLocaleString()}`;
+  renderTable(listAll, "catBestTable",
+    ["カテゴリ","ランク","JANコード","商品名","売上金額合計","売上点数合計","粗利合計","購買ユニークユーザー数","リピートユーザー数"],
+    null);
+
+  lastCatBestRows = listAll;
+  lastCatBestMeta = { start:s||"", end:e||"", metric };
+  $("catBestExport").disabled = !lastCatBestRows || !lastCatBestRows.length;
+}
+function exportCategoryBestCSV(){
+  if (!lastCatBestRows || !lastCatBestRows.length) return;
+  const headers = ["カテゴリ","ランク","JANコード","商品名","売上金額合計","売上点数合計","粗利合計","購買ユニークユーザー数","リピートユーザー数"];
+  const ymd = s=> s ? s.replaceAll("-","/") : "-";
+  const metricLabel = { amt:"購入額合計順", qty:"点数順", gp:"粗利額合計順", uniq:"購入ユニークユーザー数合計順", repeat:"リピートユーザー数合計順" }[lastCatBestMeta.metric] || "購入額合計順";
+  const preface = `${ymd(lastCatBestMeta.start)} ~ ${ymd(lastCatBestMeta.end)} 商品分類別ベスレポ（各カテゴリTop20・${metricLabel}）`;
+  const lines = ["\uFEFF"+preface, headers.join(",")];
+  for (const r of lastCatBestRows){
+    const row = headers.map(h=>{
+      let v = r[h]; if (v==null) v="";
+      v = String(v).replaceAll('"','""');
+      if (/[",\n]/.test(v)) v=`"${v}"`;
+      return v;
+    });
+    lines.push(row.join(","));
+  }
+  const csv = lines.join("\n");
+  const fn = `${lastCatBestMeta.start||"all"}_${lastCatBestMeta.end||"all"}_category_best.csv`;
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=fn; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 
     // ===== セグメント分析 =====
     function computeSegReport(){
@@ -1284,6 +1490,15 @@ matched++;
       // 併売
       $("pairRun")?.addEventListener("click", computePairReport);
       $("pairExport")?.addEventListener("click", exportPairCSV);
+
+      // 商品分類別集計
+      $("catRun")?.addEventListener("click", computeCategoryReport);
+      $("catExport")?.addEventListener("click", exportCategoryCSV);
+
+      // 商品分類別ベスレポ
+      $("catBestRun")?.addEventListener("click", computeCategoryBestReport);
+      $("catBestExport")?.addEventListener("click", exportCategoryBestCSV);
+
 
       // 初期UI
       updateButton();
