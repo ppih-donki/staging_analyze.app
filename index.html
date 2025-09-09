@@ -59,12 +59,13 @@
     <div class="tab" data-tab="segTab">セグメント分析</div>
     <div class="tab" data-tab="repeatOnlyTab">リピート分析</div>
     <div class="tab" data-tab="pairOnlyTab">併売分析</div>
+    <div class="tab" data-tab="wasteTab">廃棄分析</div>
   </div>
 
   <!-- 取り込みデータsummary -->
   <div id="previewTab" class="tabcontent active">
     <div class="card">
-      <h2>取り込みサマリー</h2>
+      <h2>取り込みデータのサンプル50件を表示しています</h2>
       <div class="metrics" id="summary"></div>
       <div class="diag" id="masterDiag" style="display:none;"></div>
       <div id="preview" class="muted">（先頭50行プレビューを表示）</div>
@@ -74,7 +75,7 @@
   <!-- ベスレポ集計 -->
   <div id="bestTab" class="tabcontent">
     <div class="card">
-      <h2>ベスレポ集計</h2>
+      <h2>単品別ベスレポ集計</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="bestStart" /></div>
         <div><label>終了日</label><input type="date" id="bestEnd" /></div>
@@ -101,7 +102,7 @@
   <!-- ▼ 新規：商品分類別集計 -->
   <div id="catTab" class="tabcontent">
     <div class="card">
-      <h2>商品分類別集計</h2>
+      <h2>カテゴリ(小分類)ごとの集計データです</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="catStart" /></div>
         <div><label>終了日</label><input type="date" id="catEnd" /></div>
@@ -128,7 +129,7 @@
   <!-- ▼ 新規：商品分類別ベスレポ -->
   <div id="catBestTab" class="tabcontent">
     <div class="card">
-      <h2>商品分類別ベスレポ</h2>
+      <h2>カテゴリ(小分類)ごとの集計データです</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="catBestStart" /></div>
         <div><label>終了日</label><input type="date" id="catBestEnd" /></div>
@@ -155,7 +156,7 @@
   <!-- 時間帯集計 -->
   <div id="timeTab" class="tabcontent">
     <div class="card">
-      <h2>時間帯集計（1時間ごと）</h2>
+      <h2>時間別実績の集計（1時間ごと）</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="timeStart" /></div>
         <div><label>終了日</label><input type="date" id="timeEnd" /></div>
@@ -191,7 +192,7 @@
   <!-- 単品分析 -->
   <div id="prodTab" class="tabcontent">
     <div class="card">
-      <h2>単品分析</h2>
+      <h2>単品分析したい商品のJANコードを入力して集計を実行してください</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="prodStart" /></div>
         <div><label>終了日</label><input type="date" id="prodEnd" /></div>
@@ -209,7 +210,7 @@
   <div id="rfmTab" class="tabcontent">
     <div class="card">
       <div class="hstack">
-        <h2 style="margin:0;">RFM分析</h2>
+        <h2 style="margin:0;">RFM分析　※RFMの詳細はこちらを確認してください⇒</h2>
         <button class="info-btn" data-modal="modalRfm" title="RFMの説明">i</button>
         <button class="info-btn" data-modal="modalScore" title="スコアリングの説明">i</button>
         <button class="info-btn" data-modal="modalSeg" title="セグメント定義">i</button>
@@ -246,7 +247,13 @@
   <!-- セグメント分析（実装） -->
   <div id="segTab" class="tabcontent">
     <div class="card">
-      <h2>セグメント分析</h2>
+      <div class="hstack">
+        <h2 style="margin:0;">セグメント別購買傾向分析　※セグメント・スコアリングの詳細はこちらを確認してください⇒</h2>
+        <button class="info-btn" data-modal="modalRfm" title="RFMの説明">i</button>
+        <button class="info-btn" data-modal="modalScore" title="スコアリングの説明">i</button>
+        <button class="info-btn" data-modal="modalSeg" title="セグメント定義">i</button>
+      </div>
+
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="segStart" /></div>
         <div><label>終了日</label><input type="date" id="segEnd" /></div>
@@ -290,7 +297,7 @@
   <!-- リピート分析（実装） -->
   <div id="repeatOnlyTab" class="tabcontent">
     <div class="card">
-      <h2>リピート分析</h2>
+      <h2>リピート分析　※※RFMスコアをもとに5つに分けたセグメントごとに、単品のリピート購買傾向を集計できます</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="repeatStart" /></div>
         <div><label>終了日</label><input type="date" id="repeatEnd" /></div>
@@ -319,7 +326,7 @@
   <!-- 併売分析（実装） -->
   <div id="pairOnlyTab" class="tabcontent">
     <div class="card">
-      <h2>併売分析</h2>
+      <h2>併売分析　1会計で同時に購入されている商品のデータを集計できます</h2>
       <div class="form-row">
         <div><label>開始日</label><input type="date" id="pairStart" /></div>
         <div><label>終了日</label><input type="date" id="pairEnd" /></div>
@@ -353,6 +360,47 @@
 
       <div id="pairInfo" class="muted" style="margin-bottom:8px;"></div>
       <div id="pairTable"></div>
+    </div>
+  </div>
+
+<!-- 廃棄分析 -->
+<div id="wasteTab" class="tabcontent">
+  <div class="card">
+    <h2>廃棄分析（CSV取り込み → 月単位/全期間 集計）</h2>
+
+    <div class="form-row">
+      <div>
+        <button id="wastePickBtn" class="btn" type="button">廃棄データCSVを選択</button>
+        <input id="wasteFile" type="file" accept=".csv" style="display:none" />
+        <span id="wasteStatus" class="muted">未取り込み</span>
+      </div>
+
+      <div>
+        <label>集計単位</label>
+        <div class="btn-group">
+          <label class="radio"><input type="radio" name="wasteAgg" value="month" checked> 月単位</label>
+          <label class="radio"><input type="radio" name="wasteAgg" value="total"> 全期間</label>
+        </div>
+      </div>
+
+      <div>
+        <button id="wasteExportBtn" class="btn" type="button" disabled>CSV出力</button>
+      </div>
+    </div>
+
+    <div id="wasteTable" class="table-wrap"></div>
+    <div id="wastePlot" style="height:380px;"></div>
+  </div>
+</div>
+
+
+  <!-- 取り込みデータsummary -->
+  <div id="previewTab" class="tabcontent active">
+    <div class="card">
+      <h2>取り込みデータのサンプル50件を表示しています</h2>
+      <div class="metrics" id="summary"></div>
+      <div class="diag" id="msg"></div>
+      <div id="summaryTbl"></div>
     </div>
   </div>
 
@@ -392,5 +440,7 @@
   </div></div>
 
   <script src="assets/js/inline_1.js"></script>
+
+  <script src="assets/js/waste.js"></script>
 </body>
 </html>
