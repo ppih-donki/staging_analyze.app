@@ -31,6 +31,7 @@
       <div class="fileline">
         <button id="pickPm" class="btn secondary" type="button">商品マスタ取り込み(csv)</button>
         <span id="fnamePm" class="fname muted">未選択</span>
+      </div>
     </div>
 
     <!-- 実体の file input -->
@@ -43,15 +44,15 @@
       <span id="catStatus" class="muted">カテゴリマスタ：サーバーから取り込み済み</span>
     </div>
 
-    <p class="muted" style="margin-top:8px;">
-      　
-    </p>
+    <p class="muted" id="status" style="margin-top:8px;"></p>
   </div>
 
   <!-- タブ -->
   <div class="tabs">
     <div class="tab active" data-tab="previewTab">取り込みデータsummary</div>
     <div class="tab" data-tab="bestTab">ベスレポ集計</div>
+    <div class="tab" data-tab="catTab">商品分類別集計</div>
+    <div class="tab" data-tab="catBestTab">商品分類別ベスレポ</div>
     <div class="tab" data-tab="timeTab">時間帯集計</div>
     <div class="tab" data-tab="prodTab">単品分析</div>
     <div class="tab" data-tab="rfmTab">RFM分析</div>
@@ -94,6 +95,60 @@
       </div>
       <div id="bestInfo" class="muted" style="margin-bottom:8px;"></div>
       <div id="bestTable"></div>
+    </div>
+  </div>
+
+  <!-- ▼ 新規：商品分類別集計 -->
+  <div id="catTab" class="tabcontent">
+    <div class="card">
+      <h2>商品分類別集計</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="catStart" /></div>
+        <div><label>終了日</label><input type="date" id="catEnd" /></div>
+        <div>
+          <label>集計方法</label>
+          <select id="catMetric">
+            <option value="qty">点数順</option>
+            <option value="amt">購入額合計順</option>
+            <option value="gp">粗利額合計順</option>
+            <option value="uniq">購入ユニークユーザー数合計順</option>
+            <option value="repeat">リピートユーザー数合計順</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="catRun" class="btn">この条件で集計</button>
+          <button id="catExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+      <div id="catInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="catTable"></div>
+    </div>
+  </div>
+
+  <!-- ▼ 新規：商品分類別ベスレポ -->
+  <div id="catBestTab" class="tabcontent">
+    <div class="card">
+      <h2>商品分類別ベスレポ</h2>
+      <div class="form-row">
+        <div><label>開始日</label><input type="date" id="catBestStart" /></div>
+        <div><label>終了日</label><input type="date" id="catBestEnd" /></div>
+        <div>
+          <label>集計方法</label>
+          <select id="catBestMetric">
+            <option value="amt">購入額合計順</option>
+            <option value="qty">点数順</option>
+            <option value="gp">粗利額合計順</option>
+            <option value="uniq">購入ユニークユーザー数合計順</option>
+            <option value="repeat">リピートユーザー数合計順</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="catBestRun" class="btn">この条件で集計</button>
+          <button id="catBestExport" class="btn ghost" disabled>CSVエクスポート</button>
+        </div>
+      </div>
+      <div id="catBestInfo" class="muted" style="margin-bottom:8px;"></div>
+      <div id="catBestTable"></div>
     </div>
   </div>
 
