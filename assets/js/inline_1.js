@@ -17,8 +17,8 @@
 
     function parseCSVFile(file){
       return new Promise((resolve,reject)=>{
-        Papa.parse(file, {
-          header:true, skipEmptyLines:true, encoding:"UTF-8",
+        const enc = /商品マスタ|ﾏｽﾀ|マスタ/i.test(file.name) ? "Shift_JIS" : "UTF-8";
+        Papa.parse(file, { header:true, skipEmptyLines:true, encoding:enc,
           complete: (res)=>{
             const headers = res.meta.fields.map(h=>toNarrow(h));
             const data = res.data.map(row=>{
@@ -33,6 +33,18 @@
           }, error: reject
         });
       });
+    }
+
+    function normalizeDigits(s){ if(s==null) return ""; return String(toNarrow(s)).replace(/\D+/g, ""); }
+
+    function resolveHeader(headers, candidates, indexFallback){
+      const norm = (s)=> toNarrow(s).toLowerCase().replace(/\s+/g, "");
+      const list = headers.map(h=>norm(h));
+      for(const c of (candidates||[])){
+        const k = norm(c); const i = list.indexOf(k); if(i>=0) return headers[i];
+      }
+      if(Number.isInteger(indexFallback) && headers.length>indexFallback) return headers[indexFallback];
+      return null;
     }
 
     function toNumber(x, def=0){
@@ -154,17 +166,21 @@
       const codeHdr = findHeader(headers, codeCands);
       const catHdr  = findHeader(headers, catCands);
       const nameHdr = findHeader(headers, nameCands);
-      let   costHdr = findHeader(headers, costCands);
-      if (!costHdr && headers.length > 12) costHdr = headers[12]; // M列
+      let   costHdr = resolveHeader(headers, costCands, 12);
 
       for (const r of pmRows){
-        const code = toNarrow(codeHdr ? r[codeHdr] : "").trim();
+        const codeRaw = toNarrow(codeHdr ? r[codeHdr] : "").trim();
+        const code = normalizeDigits(codeRaw);
         if (!code) continue;
         const nm   = toNarrow(nameHdr ? r[nameHdr] : "") || "";
         const cat  = toNarrow(catHdr ? r[catHdr] : "") || "";
-        let cost = 0;
-        if (costHdr && r.hasOwnProperty(costHdr)) cost = toNumber(r[costHdr], 0);
-        map.set(code, { 商品名: nm, 商品分類: cat, POS原価: cost });
+        let cost = 0; let 未登録 = false;
+        if (costHdr && r.hasOwnProperty(costHdr)) {
+          const rawCost = String(r[costHdr] ?? "").trim();
+          if (rawCost === "**********") { cost = 0; 未登録 = true; }
+          else { cost = toNumber(rawCost, 0); }
+        }
+        map.set(code, { 商品名: nm, 商品分類: cat, POS原価: cost, 未登録 });
       }
       return map;
     }
@@ -233,11 +249,12 @@
           let 原価 = 0;
 
           if (masterMap && masterMap.has(r.JANコード)){
-            const m = masterMap.get(r.JANコード);
+            const m = (()=>{ const janRaw = toNarrow(r.JANコード); const key = normalizeDigits(janRaw); return masterMap.get(key); })();
             if (m.商品名) 商品名2 = m.商品名;
             商品分類 = m.商品分類 || "";
             原価 = toNumber(m.POS原価, 0);
-            matched++;
+                      if (m && m.未登録) { 原価 = toNumber(r.商品価格, 0); }
+matched++;
           } else if (masterMap){
             unmatchedJAN.set(r.JANコード, (unmatchedJAN.get(r.JANコード)||0)+1);
           }
