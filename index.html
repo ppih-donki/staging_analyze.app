@@ -367,14 +367,12 @@
 <div id="wasteTab" class="tabcontent">
   <div class="card">
     <h2>廃棄分析（CSV取り込み → 月単位/全期間 集計）</h2>
-
     <div class="form-row">
       <div>
         <button id="wastePickBtn" class="btn" type="button">廃棄データCSVを選択</button>
         <input id="wasteFile" type="file" accept=".csv" style="display:none" />
         <span id="wasteStatus" class="muted">未取り込み</span>
       </div>
-
       <div>
         <label>集計単位</label>
         <div class="btn-group">
@@ -382,17 +380,23 @@
           <label class="radio"><input type="radio" name="wasteAgg" value="total"> 全期間</label>
         </div>
       </div>
-
+      <div>
+        <label for="wasteMonthSel">対象月</label>
+        <select id="wasteMonthSel" class="input" disabled></select>
+      </div>
+      <div>
+        <button id="wasteRunBtn" class="btn" type="button">この条件で実行</button>
+      </div>
       <div>
         <button id="wasteExportBtn" class="btn" type="button" disabled>CSV出力</button>
       </div>
     </div>
-
     <div id="wasteTable" class="table-wrap"></div>
     <div id="wastePlot" style="height:380px;"></div>
   </div>
 </div>
-
+</body>
+</html>
 
   <!-- 取り込みデータsummary -->
   <div id="previewTab" class="tabcontent active">
